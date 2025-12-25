@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scan2PDF Web</title>
+</head>
+<body>
+  <h1>Scan2PDF Web</h1>
+
+  <!-- Buttons -->
+  <input type="file" id="fileInput" multiple accept="image/*">
+  <br><br>
+  <button id="convertPdfBtn">Convert to PDF</button>
+  <button id="convertOcrBtn">Convert to OCR</button>
+
+  <h2>OCR Text</h2>
+  <pre id="ocrText"></pre>
+
+  <!-- Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
+
+  <script>
+    const { jsPDF } = window.jspdf;
+    const fileInput = document.getElementById('fileInput');
+    const convertPdfBtn = document.getElementById('convertPdfBtn');
+    const convertOcrBtn = document.getElementById('convertOcrBtn');
+    const ocrTextArea = document.getElementById('ocrText');
+
+    let images = [];
+
+    // Upload Images
+    fileInput.addEventListener('change', () => {
+      images = Array.from(fileInput.files);
+      alert(`${images.length} image(s) uploaded successfully!`);
+    });
+
+    // Convert to PDF
+    convertPdfBtn.addEventListener('click', async () => {
+      if (!images.length) {
+        alert("Please upload images first!");
+        return;
+      }
+
+      const pdf = new jsPDF();
+      for (let i = 0; i < images.length; i++) {
+        const imgData = await readFileAsDataURL(images[i]);
+        const img = new Image();
+        img.src = imgData;
+        await img.decode();
+
+        const imgWidth = 190;
+        const imgHeight = (img.height * imgWidth) / img.width;
+
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 10, 10, imgWidth, imgHeight);
+      }
+      pdf.save('scan2pdf.pdf');
+    });
+
+    // Convert to OCR
+    convertOcrBtn.addEventListener('click', async () => {
+      if (!images.length) {
+        alert("Please upload images first!");
+        return;
+      }
+
+      ocrTextArea.textContent = ''; // Clear previous OCR
+      for (let i = 0; i < images.length; i++) {
+        const imgData = await readFileAsDataURL(images[i]);
+        const { data: { text } } = await Tesseract.recognize(imgData, 'eng', { logger: m => console.log(m) });
+        ocrTextArea.textContent += `--- Image ${i + 1} ---\n` + text + '\n\n';
+      }
+      alert("OCR completed!");
+    });
+
+    // Helper function
+    function readFileAsDataURL(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+  </script>
+</body>
+</html>
