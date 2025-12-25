@@ -2,144 +2,149 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<title>Scan2PDF + OCR</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Scan2PDF Web</title>
 
-<!-- jsPDF -->
+<!-- External libraries (GitHub Pages SAFE) -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-<!-- Tesseract -->
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
-
-<!-- Cropper.js -->
-<link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-
 <style>
-body{
-  background: linear-gradient(135deg,#6a11cb,#2575fc);
-  color:white;
-  font-family: Arial;
-  text-align:center;
-  padding:20px;
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(135deg, #4facfe, #00f2fe);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
-.container{
-  max-width:600px;
-  margin:auto;
-  background:rgba(255,255,255,0.15);
-  padding:20px;
-  border-radius:15px;
+
+.container {
+  background: white;
+  width: 90%;
+  max-width: 420px;
+  padding: 25px;
+  border-radius: 18px;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+  text-align: center;
 }
-img{
-  max-width:100%;
-  margin-top:15px;
+
+.logo {
+  width: 100px;
+  margin-bottom: 10px;
 }
-button{
-  padding:12px 20px;
-  margin:10px;
-  background:#ff9800;
-  border:none;
-  color:white;
-  font-size:16px;
-  border-radius:8px;
-  cursor:pointer;
+
+h1 {
+  font-size: 22px;
+  margin-bottom: 20px;
+  color: #333;
 }
-button:disabled{
-  background:gray;
+
+input[type="file"] {
+  display: none;
 }
-pre{
-  background:rgba(0,0,0,0.3);
-  padding:10px;
-  border-radius:10px;
-  text-align:left;
-  max-height:200px;
-  overflow:auto;
+
+button {
+  width: 100%;
+  padding: 14px;
+  margin: 10px 0;
+  font-size: 16px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  color: white;
+}
+
+.upload { background: #4facfe; }
+.pdf { background: #28a745; }
+.ocr { background: #ff9800; }
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#preview {
+  max-width: 100%;
+  margin-top: 15px;
+  border-radius: 10px;
+  display: none;
+}
+
+#status {
+  margin-top: 12px;
+  font-size: 14px;
+  color: #555;
 }
 </style>
 </head>
 
 <body>
-
-<h1>📄 Scan2PDF Web</h1>
-
 <div class="container">
 
-<input type="file" id="fileInput" accept="image/*"><br>
+  <img src="logo.png" class="logo" alt="Logo">
 
-<img id="imagePreview" style="display:none;">
+  <h1>Scan2PDF + OCR</h1>
 
-<br>
-<button id="cropBtn" disabled>Crop & Next</button>
-<br>
-<button onclick="makePDF()" disabled id="pdfBtn">Convert to PDF</button>
-<button onclick="makeOCR()" disabled id="ocrBtn">Convert to OCR PDF</button>
+  <input type="file" id="imageInput" accept="image/*">
 
-<h3>OCR Text</h3>
-<pre id="ocrText">No OCR yet</pre>
+  <button class="upload" onclick="selectImage()">📷 Upload Image</button>
+  <button class="pdf" onclick="convertPDF()" disabled id="pdfBtn">📄 Convert to PDF</button>
+  <button class="ocr" onclick="convertOCR()" disabled id="ocrBtn">🔍 OCR to PDF</button>
+
+  <img id="preview">
+  <div id="status"></div>
 
 </div>
 
 <script>
-const { jsPDF } = window.jspdf;
+let selectedImage = null;
 
-let cropper;
-let croppedImage = null;
+function selectImage() {
+  document.getElementById('imageInput').click();
+}
 
-const fileInput = document.getElementById("fileInput");
-const imagePreview = document.getElementById("imagePreview");
-
-fileInput.addEventListener("change", e => {
+document.getElementById('imageInput').addEventListener('change', function(e) {
   const file = e.target.files[0];
   if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = () => {
-    imagePreview.src = reader.result;
-    imagePreview.style.display = "block";
+  selectedImage = file;
+  const img = document.getElementById('preview');
+  img.src = URL.createObjectURL(file);
+  img.style.display = "block";
 
-    if (cropper) cropper.destroy();
-    cropper = new Cropper(imagePreview, {
-      viewMode: 1,
-      autoCropArea: 1
-    });
+  document.getElementById('pdfBtn').disabled = false;
+  document.getElementById('ocrBtn').disabled = false;
 
-    document.getElementById("cropBtn").disabled = false;
-  };
-  reader.readAsDataURL(file);
+  document.getElementById('status').innerText = "Image selected ✔";
 });
 
-// Crop image
-document.getElementById("cropBtn").onclick = () => {
-  const canvas = cropper.getCroppedCanvas();
-  croppedImage = canvas.toDataURL("image/jpeg");
-
-  cropper.destroy();
-  imagePreview.src = croppedImage;
-
-  document.getElementById("pdfBtn").disabled = false;
-  document.getElementById("ocrBtn").disabled = false;
-
-  alert("Image cropped! Now you can convert.");
-};
-
-// PDF
-function makePDF(){
+async function convertPDF() {
+  const { jsPDF } = window.jspdf;
   const pdf = new jsPDF();
-  pdf.addImage(croppedImage, "JPEG", 10, 10, 190, 260);
+
+  const img = document.getElementById('preview');
+  pdf.addImage(img, 'JPEG', 10, 10, 190, 0);
   pdf.save("scan2pdf.pdf");
 }
 
-// OCR + OCR PDF
-async function makeOCR(){
-  document.getElementById("ocrText").textContent = "Processing OCR...";
-  const result = await Tesseract.recognize(croppedImage,"eng");
+async function convertOCR() {
+  document.getElementById('status').innerText = "Running OCR... ⏳";
+
+  const result = await Tesseract.recognize(
+    selectedImage,
+    'eng'
+  );
+
   const text = result.data.text;
 
-  document.getElementById("ocrText").textContent = text;
-
+  const { jsPDF } = window.jspdf;
   const pdf = new jsPDF();
-  pdf.text(pdf.splitTextToSize(text,180),10,10);
-  pdf.save("ocr_text.pdf");
+  pdf.text(text || "No text detected", 10, 10);
+  pdf.save("ocr-text.pdf");
+
+  document.getElementById('status').innerText = "OCR completed ✔";
 }
 </script>
 
