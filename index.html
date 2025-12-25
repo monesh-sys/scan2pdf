@@ -33,7 +33,13 @@ body {
 }
 
 .logo {
-  width: 90px;
+  width: 100px;
+  margin-bottom: 10px;
+}
+
+h2 {
+  margin: 10px 0 20px;
+  color: #333;
 }
 
 button {
@@ -53,12 +59,15 @@ button {
 .pdf { background: #28a745; }
 .ocr { background: #ff9800; }
 
-button:disabled { opacity: 0.5; }
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 video, img {
   max-width: 100%;
-  border-radius: 10px;
   margin-top: 10px;
+  border-radius: 10px;
   display: none;
 }
 </style>
@@ -67,29 +76,37 @@ video, img {
 <body>
 <div class="container">
 
-<img src="logo.png" class="logo">
-<h2>Scan2PDF + OCR</h2>
+  <!-- ✅ LOGO (THIS WILL SHOW) -->
+  <img src="logo.png" alt="Scan2PDF Logo" class="logo">
 
-<button class="camera" onclick="openCamera()">📸 Open Camera</button>
-<button class="capture" onclick="capturePhoto()" disabled id="captureBtn">📷 Capture Photo</button>
-<button class="crop" onclick="confirmCrop()" disabled id="cropBtn">✂️ Confirm Crop</button>
-<button class="pdf" onclick="convertPDF()" disabled id="pdfBtn">📄 Convert PDF</button>
-<button class="ocr" onclick="convertOCR()" disabled id="ocrBtn">🔍 OCR PDF</button>
+  <h2>Scan2PDF + OCR</h2>
 
-<video id="video" autoplay playsinline></video>
-<img id="image">
+  <button class="camera" onclick="openCamera()">📸 Open Camera</button>
+  <button class="capture" id="captureBtn" onclick="capturePhoto()" disabled>📷 Capture Photo</button>
+  <button class="crop" id="cropBtn" onclick="confirmCrop()" disabled>✂️ Confirm Crop</button>
+  <button class="pdf" id="pdfBtn" onclick="convertPDF()" disabled>📄 Convert to PDF</button>
+  <button class="ocr" id="ocrBtn" onclick="convertOCR()" disabled>🔍 OCR to PDF</button>
+
+  <video id="video" autoplay playsinline></video>
+  <img id="image">
 
 </div>
 
 <script>
-let stream, cropper, croppedBlob;
+let stream;
+let cropper;
+let croppedBlob;
 
 async function openCamera() {
-  stream = await navigator.mediaDevices.getUserMedia({ video: true });
-  const video = document.getElementById("video");
-  video.srcObject = stream;
-  video.style.display = "block";
-  document.getElementById("captureBtn").disabled = false;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    const video = document.getElementById("video");
+    video.srcObject = stream;
+    video.style.display = "block";
+    document.getElementById("captureBtn").disabled = false;
+  } catch (e) {
+    alert("Camera permission denied");
+  }
 }
 
 function capturePhoto() {
@@ -103,11 +120,14 @@ function capturePhoto() {
   img.src = canvas.toDataURL("image/jpeg");
   img.style.display = "block";
 
-  stream.getTracks().forEach(t => t.stop());
-  document.getElementById("video").style.display = "none";
+  stream.getTracks().forEach(track => track.stop());
+  video.style.display = "none";
 
   if (cropper) cropper.destroy();
-  cropper = new Cropper(img, { viewMode: 1 });
+  cropper = new Cropper(img, {
+    viewMode: 1,
+    autoCropArea: 1
+  });
 
   document.getElementById("cropBtn").disabled = false;
 }
@@ -137,7 +157,7 @@ async function convertOCR() {
   const result = await Tesseract.recognize(croppedBlob, "eng");
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF();
-  pdf.text(result.data.text || "No text found", 10, 10);
+  pdf.text(result.data.text || "No text detected", 10, 10);
   pdf.save("ocr-text.pdf");
 }
 </script>
