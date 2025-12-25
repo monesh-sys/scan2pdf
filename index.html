@@ -5,7 +5,9 @@
 <title>Scan2PDF + OCR</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- External libraries (GitHub Pages SAFE) -->
+<!-- Libraries -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -31,24 +33,13 @@ body {
 }
 
 .logo {
-  width: 100px;
-  margin-bottom: 10px;
-}
-
-h1 {
-  font-size: 22px;
-  margin-bottom: 20px;
-  color: #333;
-}
-
-input[type="file"] {
-  display: none;
+  width: 90px;
 }
 
 button {
   width: 100%;
   padding: 14px;
-  margin: 10px 0;
+  margin: 8px 0;
   font-size: 16px;
   border: none;
   border-radius: 12px;
@@ -56,26 +47,19 @@ button {
   color: white;
 }
 
-.upload { background: #4facfe; }
+.camera { background: #3f51b5; }
+.capture { background: #e91e63; }
+.crop { background: #9c27b0; }
 .pdf { background: #28a745; }
 .ocr { background: #ff9800; }
 
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+button:disabled { opacity: 0.5; }
 
-#preview {
+video, img {
   max-width: 100%;
-  margin-top: 15px;
   border-radius: 10px;
+  margin-top: 10px;
   display: none;
-}
-
-#status {
-  margin-top: 12px;
-  font-size: 14px;
-  color: #555;
 }
 </style>
 </head>
@@ -83,68 +67,78 @@ button:disabled {
 <body>
 <div class="container">
 
-  <img src="logo.png" class="logo" alt="Logo">
+<img src="logo.png" class="logo">
+<h2>Scan2PDF + OCR</h2>
 
-  <h1>Scan2PDF + OCR</h1>
+<button class="camera" onclick="openCamera()">📸 Open Camera</button>
+<button class="capture" onclick="capturePhoto()" disabled id="captureBtn">📷 Capture Photo</button>
+<button class="crop" onclick="confirmCrop()" disabled id="cropBtn">✂️ Confirm Crop</button>
+<button class="pdf" onclick="convertPDF()" disabled id="pdfBtn">📄 Convert PDF</button>
+<button class="ocr" onclick="convertOCR()" disabled id="ocrBtn">🔍 OCR PDF</button>
 
-  <input type="file" id="imageInput" accept="image/*">
-
-  <button class="upload" onclick="selectImage()">📷 Upload Image</button>
-  <button class="pdf" onclick="convertPDF()" disabled id="pdfBtn">📄 Convert to PDF</button>
-  <button class="ocr" onclick="convertOCR()" disabled id="ocrBtn">🔍 OCR to PDF</button>
-
-  <img id="preview">
-  <div id="status"></div>
+<video id="video" autoplay playsinline></video>
+<img id="image">
 
 </div>
 
 <script>
-let selectedImage = null;
+let stream, cropper, croppedBlob;
 
-function selectImage() {
-  document.getElementById('imageInput').click();
+async function openCamera() {
+  stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  const video = document.getElementById("video");
+  video.srcObject = stream;
+  video.style.display = "block";
+  document.getElementById("captureBtn").disabled = false;
 }
 
-document.getElementById('imageInput').addEventListener('change', function(e) {
-  const file = e.target.files[0];
-  if (!file) return;
+function capturePhoto() {
+  const video = document.getElementById("video");
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
 
-  selectedImage = file;
-  const img = document.getElementById('preview');
-  img.src = URL.createObjectURL(file);
+  const img = document.getElementById("image");
+  img.src = canvas.toDataURL("image/jpeg");
   img.style.display = "block";
 
-  document.getElementById('pdfBtn').disabled = false;
-  document.getElementById('ocrBtn').disabled = false;
+  stream.getTracks().forEach(t => t.stop());
+  document.getElementById("video").style.display = "none";
 
-  document.getElementById('status').innerText = "Image selected ✔";
-});
+  if (cropper) cropper.destroy();
+  cropper = new Cropper(img, { viewMode: 1 });
 
-async function convertPDF() {
+  document.getElementById("cropBtn").disabled = false;
+}
+
+function confirmCrop() {
+  const canvas = cropper.getCroppedCanvas({ width: 1200 });
+  canvas.toBlob(blob => {
+    croppedBlob = blob;
+    document.getElementById("image").src = canvas.toDataURL("image/jpeg");
+    cropper.destroy();
+    cropper = null;
+
+    document.getElementById("pdfBtn").disabled = false;
+    document.getElementById("ocrBtn").disabled = false;
+    document.getElementById("cropBtn").disabled = true;
+  }, "image/jpeg");
+}
+
+function convertPDF() {
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF();
-
-  const img = document.getElementById('preview');
-  pdf.addImage(img, 'JPEG', 10, 10, 190, 0);
+  pdf.addImage(document.getElementById("image"), "JPEG", 10, 10, 190, 0);
   pdf.save("scan2pdf.pdf");
 }
 
 async function convertOCR() {
-  document.getElementById('status').innerText = "Running OCR... ⏳";
-
-  const result = await Tesseract.recognize(
-    selectedImage,
-    'eng'
-  );
-
-  const text = result.data.text;
-
+  const result = await Tesseract.recognize(croppedBlob, "eng");
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF();
-  pdf.text(text || "No text detected", 10, 10);
+  pdf.text(result.data.text || "No text found", 10, 10);
   pdf.save("ocr-text.pdf");
-
-  document.getElementById('status').innerText = "OCR completed ✔";
 }
 </script>
 
