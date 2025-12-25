@@ -33,14 +33,11 @@ body {
 }
 
 .logo {
-  width: 100px;
+  width: 90px;
   margin-bottom: 10px;
 }
 
-h2 {
-  margin: 10px 0 20px;
-  color: #333;
-}
+h2 { margin-bottom: 15px; }
 
 button {
   width: 100%;
@@ -54,6 +51,7 @@ button {
 }
 
 .camera { background: #3f51b5; }
+.switch { background: #607d8b; }
 .capture { background: #e91e63; }
 .crop { background: #9c27b0; }
 .pdf { background: #28a745; }
@@ -76,16 +74,17 @@ video, img {
 <body>
 <div class="container">
 
-  <!-- ✅ LOGO (THIS WILL SHOW) -->
-  <img src="logo.png" alt="Scan2PDF Logo" class="logo">
+  <!-- LOGO -->
+  <img src="logo.png" alt="Logo" class="logo">
 
   <h2>Scan2PDF + OCR</h2>
 
   <button class="camera" onclick="openCamera()">📸 Open Camera</button>
-  <button class="capture" id="captureBtn" onclick="capturePhoto()" disabled>📷 Capture Photo</button>
-  <button class="crop" id="cropBtn" onclick="confirmCrop()" disabled>✂️ Confirm Crop</button>
-  <button class="pdf" id="pdfBtn" onclick="convertPDF()" disabled>📄 Convert to PDF</button>
-  <button class="ocr" id="ocrBtn" onclick="convertOCR()" disabled>🔍 OCR to PDF</button>
+  <button class="switch" onclick="switchCamera()" id="switchBtn" disabled>🔁 Switch Camera</button>
+  <button class="capture" onclick="capturePhoto()" id="captureBtn" disabled>📷 Capture Photo</button>
+  <button class="crop" onclick="confirmCrop()" id="cropBtn" disabled>✂️ Confirm Crop</button>
+  <button class="pdf" onclick="convertPDF()" id="pdfBtn" disabled>📄 Convert to PDF</button>
+  <button class="ocr" onclick="convertOCR()" id="ocrBtn" disabled>🔍 OCR to PDF</button>
 
   <video id="video" autoplay playsinline></video>
   <img id="image">
@@ -96,16 +95,36 @@ video, img {
 let stream;
 let cropper;
 let croppedBlob;
+let useFrontCamera = false;
 
 async function openCamera() {
+  stopCamera();
+
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: useFrontCamera ? "user" : "environment" }
+    });
+
     const video = document.getElementById("video");
     video.srcObject = stream;
     video.style.display = "block";
+
     document.getElementById("captureBtn").disabled = false;
+    document.getElementById("switchBtn").disabled = false;
   } catch (e) {
-    alert("Camera permission denied");
+    alert("Camera access denied or not available");
+  }
+}
+
+function switchCamera() {
+  useFrontCamera = !useFrontCamera;
+  openCamera();
+}
+
+function stopCamera() {
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+    stream = null;
   }
 }
 
@@ -120,23 +139,22 @@ function capturePhoto() {
   img.src = canvas.toDataURL("image/jpeg");
   img.style.display = "block";
 
-  stream.getTracks().forEach(track => track.stop());
+  stopCamera();
   video.style.display = "none";
 
   if (cropper) cropper.destroy();
-  cropper = new Cropper(img, {
-    viewMode: 1,
-    autoCropArea: 1
-  });
+  cropper = new Cropper(img, { viewMode: 1 });
 
   document.getElementById("cropBtn").disabled = false;
 }
 
 function confirmCrop() {
   const canvas = cropper.getCroppedCanvas({ width: 1200 });
+
   canvas.toBlob(blob => {
     croppedBlob = blob;
     document.getElementById("image").src = canvas.toDataURL("image/jpeg");
+
     cropper.destroy();
     cropper = null;
 
