@@ -5,136 +5,111 @@
 <title>Scan2PDF + OCR</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: linear-gradient(135deg, #4facfe, #00f2fe);
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.container {
-  background: white;
-  width: 90%;
-  max-width: 420px;
-  padding: 25px;
-  border-radius: 18px;
-  box-shadow: 0 15px 40px rgba(0,0,0,0.2);
-  text-align: center;
-}
-
-.logo { width: 90px; margin-bottom: 10px; }
-h2 { margin-bottom: 15px; }
-button {
-  width: 100%; padding: 14px; margin: 8px 0;
-  font-size: 16px; border: none; border-radius: 12px;
-  cursor: pointer; color: white;
-}
-.camera { background: #3f51b5; }
-.pdf { background: #28a745; }
-.ocr { background: #ff9800; }
-button:disabled { opacity: 0.5; }
-img { max-width: 100%; margin-top: 10px; border-radius: 10px; display: none; }
-p { font-size:14px; color:#555; }
+body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#4facfe,#00f2fe);min-height:100vh;display:flex;justify-content:center;align-items:center;}
+.container{background:white;width:90%;max-width:420px;padding:25px;border-radius:18px;box-shadow:0 15px 40px rgba(0,0,0,0.2);text-align:center;}
+.logo{width:90px;margin-bottom:10px;}
+h2{margin-bottom:15px;}
+button{width:100%;padding:14px;margin:8px 0;font-size:16px;border:none;border-radius:12px;cursor:pointer;color:white;}
+.camera{background:#3f51b5;}
+.pdf{background:#28a745;}
+.ocr{background:#ff9800;}
+button:disabled{opacity:0.5;}
+img{max-width:100%;margin-top:10px;border-radius:10px;display:none;}
+p{font-size:14px;color:#555;}
 </style>
 </head>
 <body>
 
 <div class="container">
-  <img src="logo.png" class="logo" alt="Logo">
-  <h2>Scan2PDF + OCR</h2>
-  <p>Take a photo. Auto-crop runs automatically.</p>
+<img src="logo.png" class="logo" alt="Logo">
+<h2>Scan2PDF + OCR</h2>
+<p>Take a photo. Auto-crop and resize runs automatically for OCR.</p>
 
-  <input type="file" accept="image/*" capture id="cameraInput" hidden>
-  <button class="camera" onclick="openPhoneCamera()">📸 Take Photo</button>
-  <button class="pdf" id="pdfBtn" onclick="convertPDF()" disabled>📄 Convert to PDF</button>
-  <button class="ocr" id="ocrBtn" onclick="convertOCR()" disabled>🔍 OCR to PDF</button>
+<input type="file" accept="image/*" capture id="cameraInput" hidden>
+<button class="camera" onclick="openPhoneCamera()">📸 Take Photo</button>
+<button class="pdf" id="pdfBtn" onclick="convertPDF()" disabled>📄 Convert to PDF</button>
+<button class="ocr" id="ocrBtn" onclick="convertOCR()" disabled>🔍 OCR to PDF</button>
 
-  <img id="image">
+<img id="image">
+
 </div>
 
 <script>
 let croppedBlob;
 
-function openPhoneCamera() {
+function openPhoneCamera(){
   document.getElementById("cameraInput").click();
 }
 
-document.getElementById("cameraInput").addEventListener("change", e => {
+document.getElementById("cameraInput").addEventListener("change", e=>{
   const file = e.target.files[0];
-  if (!file) return;
-
+  if(!file) return;
   const img = new Image();
-  img.onload = () => autoCrop(img);
+  img.onload = ()=>autoCropResize(img);
   img.src = URL.createObjectURL(file);
 });
 
-function autoCrop(img) {
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  canvas.width = img.width;
-  canvas.height = img.height;
-  ctx.drawImage(img, 0, 0);
+function autoCropResize(img){
+  // Canvas for processing
+  const canvas=document.createElement("canvas");
+  const ctx=canvas.getContext("2d");
+  canvas.width=img.width;
+  canvas.height=img.height;
+  ctx.drawImage(img,0,0);
 
-  // Simple auto-crop: center-focused
-  const marginX = img.width * 0.05;
-  const marginY = img.height * 0.05;
-  const cropX = marginX;
-  const cropY = marginY;
-  const cropW = img.width - marginX * 2;
-  const cropH = img.height - marginY * 2;
+  // Simple center crop 5% margin
+  const marginX=img.width*0.05;
+  const marginY=img.height*0.05;
+  const cropX=marginX, cropY=marginY, cropW=img.width-marginX*2, cropH=img.height-marginY*2;
 
-  const cropCanvas = document.createElement("canvas");
-  cropCanvas.width = cropW;
-  cropCanvas.height = cropH;
-  cropCanvas.getContext("2d").drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+  // Cropped canvas
+  const cropCanvas=document.createElement("canvas");
+  cropCanvas.width=cropW; cropCanvas.height=cropH;
+  cropCanvas.getContext("2d").drawImage(canvas,cropX,cropY,cropW,cropH,0,0,cropW,cropH);
 
-  // Save cropped blob
-  cropCanvas.toBlob(blob => {
-    croppedBlob = blob;
+  // Resize for OCR (max width 1024)
+  const maxWidth=1024;
+  let finalCanvas=document.createElement("canvas");
+  let scale=Math.min(1,maxWidth/cropW);
+  finalCanvas.width=cropW*scale;
+  finalCanvas.height=cropH*scale;
+  finalCanvas.getContext("2d").drawImage(cropCanvas,0,0,finalCanvas.width,finalCanvas.height);
 
-    const preview = document.getElementById("image");
-    preview.src = cropCanvas.toDataURL("image/jpeg");
-    preview.style.display = "block";
-
-    document.getElementById("pdfBtn").disabled = false;
-    document.getElementById("ocrBtn").disabled = false;
-  }, "image/jpeg");
+  finalCanvas.toBlob(blob=>{
+    croppedBlob=blob;
+    const preview=document.getElementById("image");
+    preview.src=URL.createObjectURL(blob);
+    preview.style.display="block";
+    document.getElementById("pdfBtn").disabled=false;
+    document.getElementById("ocrBtn").disabled=false;
+  },"image/jpeg");
 }
 
-function convertPDF() {
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF();
-  pdf.addImage(document.getElementById("image"), "JPEG", 10, 10, 190, 0);
+function convertPDF(){
+  const { jsPDF }=window.jspdf;
+  const pdf=new jsPDF();
+  pdf.addImage(document.getElementById("image"),"JPEG",10,10,190,0);
   pdf.save("scan2pdf.pdf");
 }
 
-async function convertOCR() {
-  if (!croppedBlob) return alert("No image available");
-
-  const imgData = await blobToDataURL(croppedBlob);
-
-  // Run OCR
-  const result = await Tesseract.recognize(imgData, "eng", { logger: m => console.log(m) });
-
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF();
-  pdf.text(result.data.text || "No text detected", 10, 10);
+async function convertOCR(){
+  if(!croppedBlob) return alert("No image available");
+  const dataURL=await blobToDataURL(croppedBlob);
+  const result=await Tesseract.recognize(dataURL,"eng",{logger:m=>console.log(m)});
+  const { jsPDF }=window.jspdf;
+  const pdf=new jsPDF();
+  pdf.text(result.data.text || "No text detected",10,10);
   pdf.save("ocr-text.pdf");
 }
 
-// Helper: Blob → DataURL
-function blobToDataURL(blob) {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = e => resolve(e.target.result);
+function blobToDataURL(blob){
+  return new Promise(resolve=>{
+    const reader=new FileReader();
+    reader.onload=e=>resolve(e.target.result);
     reader.readAsDataURL(blob);
   });
 }
@@ -142,4 +117,3 @@ function blobToDataURL(blob) {
 
 </body>
 </html>
-
