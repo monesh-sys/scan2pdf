@@ -51,18 +51,15 @@ button {
 }
 
 .camera { background: #3f51b5; }
-.switch { background: #607d8b; }
-.capture { background: #e91e63; }
 .crop { background: #9c27b0; }
 .pdf { background: #28a745; }
 .ocr { background: #ff9800; }
 
 button:disabled {
   opacity: 0.5;
-  cursor: not-allowed;
 }
 
-video, img {
+img {
   max-width: 100%;
   margin-top: 10px;
   border-radius: 10px;
@@ -75,78 +72,49 @@ video, img {
 <div class="container">
 
   <!-- LOGO -->
-  <img src="logo.png" alt="Logo" class="logo">
+  <img src="logo.png" class="logo" alt="Logo">
 
   <h2>Scan2PDF + OCR</h2>
 
-  <button class="camera" onclick="openCamera()">📸 Open Camera</button>
-  <button class="switch" onclick="switchCamera()" id="switchBtn" disabled>🔁 Switch Camera</button>
-  <button class="capture" onclick="capturePhoto()" id="captureBtn" disabled>📷 Capture Photo</button>
-  <button class="crop" onclick="confirmCrop()" id="cropBtn" disabled>✂️ Confirm Crop</button>
-  <button class="pdf" onclick="convertPDF()" id="pdfBtn" disabled>📄 Convert to PDF</button>
-  <button class="ocr" onclick="convertOCR()" id="ocrBtn" disabled>🔍 OCR to PDF</button>
+  <!-- Hidden camera input -->
+  <input
+    type="file"
+    id="cameraInput"
+    accept="image/*"
+    capture="environment"
+    hidden
+  >
 
-  <video id="video" autoplay playsinline></video>
+  <button class="camera" onclick="openPhoneCamera()">📸 Take Photo</button>
+  <button class="crop" id="cropBtn" onclick="confirmCrop()" disabled>✂️ Confirm Crop</button>
+  <button class="pdf" id="pdfBtn" onclick="convertPDF()" disabled>📄 Convert to PDF</button>
+  <button class="ocr" id="ocrBtn" onclick="convertOCR()" disabled>🔍 OCR to PDF</button>
+
   <img id="image">
 
 </div>
 
 <script>
-let stream;
 let cropper;
 let croppedBlob;
-let useFrontCamera = false;
 
-async function openCamera() {
-  stopCamera();
-
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: useFrontCamera ? "user" : "environment" }
-    });
-
-    const video = document.getElementById("video");
-    video.srcObject = stream;
-    video.style.display = "block";
-
-    document.getElementById("captureBtn").disabled = false;
-    document.getElementById("switchBtn").disabled = false;
-  } catch (e) {
-    alert("Camera access denied or not available");
-  }
+function openPhoneCamera() {
+  document.getElementById("cameraInput").click();
 }
 
-function switchCamera() {
-  useFrontCamera = !useFrontCamera;
-  openCamera();
-}
-
-function stopCamera() {
-  if (stream) {
-    stream.getTracks().forEach(track => track.stop());
-    stream = null;
-  }
-}
-
-function capturePhoto() {
-  const video = document.getElementById("video");
-  const canvas = document.createElement("canvas");
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext("2d").drawImage(video, 0, 0);
+document.getElementById("cameraInput").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
 
   const img = document.getElementById("image");
-  img.src = canvas.toDataURL("image/jpeg");
+  img.src = URL.createObjectURL(file);
   img.style.display = "block";
 
-  stopCamera();
-  video.style.display = "none";
-
   if (cropper) cropper.destroy();
-  cropper = new Cropper(img, { viewMode: 1 });
+  cropper = new Cropper(img, { viewMode: 1, autoCropArea: 1 });
 
   document.getElementById("cropBtn").disabled = false;
-}
+});
 
 function confirmCrop() {
   const canvas = cropper.getCroppedCanvas({ width: 1200 });
